@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "memnetai-agent-integration"
+version = "0.1.0.dev0"
+description = "Local-first MemNetAI integration for AI agent hosts"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+authors = [
+  { name = "DongLiStudio" },
+]
+keywords = ["ai-agent", "long-term-memory", "memnetai"]
+classifiers = [
+  "Development Status :: 2 - Pre-Alpha",
+  "License :: OSI Approved :: Apache Software License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8,<9",
+  "ruff>=0.9,<1",
+]
+
+[project.scripts]
+memnetai-integration = "memnetai_agent_integration.cli:main"
+
+[project.urls]
+Homepage = "https://memnetai.com"
+Documentation = "https://docs.memnetai.com"
+Dashboard = "https://dashboard.memnetai.com"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/memnetai_agent_integration"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
