@@ -29,6 +29,12 @@ class ScaffoldTests(unittest.TestCase):
                 }
             self.assertTrue({"sessions", "messages", "batches"}.issubset(tables))
 
+    def test_install_skill_has_no_template_placeholders(self) -> None:
+        skill = Path("skills/install-memnetai/SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("name: install-memnetai", skill)
+        self.assertNotIn("TODO", skill)
+        self.assertNotIn("PLACEHOLDER", skill)
+
 
 if __name__ == "__main__":
     unittest.main()

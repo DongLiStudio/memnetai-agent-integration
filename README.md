@@ -31,7 +31,12 @@ src/memnetai_agent_integration/
   database.py     SQLite 初始化与会话状态
 tests/            自动化测试
 docs/             架构与兼容性文档
+skills/           交给 Agent 使用的安装协调 Skill
 ```
+
+## Agent 一键安装入口
+
+仓库内提供 `skills/install-memnetai/SKILL.md`。用户把仓库链接或安装包交给 Agent，并说“安装 MemNetAI”后，Agent 应读取该 Skill，按两阶段流程完成准备、API Key 配置、Hook 和计划任务验证。
 
 ## 计划中的用户体验
 
@@ -58,4 +63,3 @@ python -m unittest discover -s tests
 ## 许可证
 
 Apache License 2.0。参见 [LICENSE](LICENSE)。
-
