@@ -6,7 +6,7 @@ import subprocess
 from pathlib import Path
 from typing import Callable, Sequence
 
-from .base import AdapterResult, command_exists, home_from_env
+from .base import AdapterResult, command_exists
 
 
 PLUGIN_YAML = """name: memnetai-memory
@@ -73,11 +73,22 @@ class HermesAdapter:
 
     @staticmethod
     def _run(args: Sequence[str]) -> subprocess.CompletedProcess[str]:
-        return subprocess.run(list(args), capture_output=True, text=True, check=False)
+        return subprocess.run(
+            list(args), capture_output=True, text=True, encoding="utf-8", errors="replace",
+            check=False,
+        )
 
     @property
     def plugin_dir(self) -> Path:
-        return home_from_env("HERMES_HOME", ".hermes") / "plugins" / "memnetai-memory"
+        override = os.environ.get("HERMES_HOME")
+        if override:
+            home = Path(override).expanduser()
+        elif os.name == "nt":
+            base = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local"))
+            home = base / "hermes"
+        else:
+            home = Path.home() / ".hermes"
+        return home / "plugins" / "memnetai-memory"
 
     def detect(self) -> bool:
         return command_exists("hermes", "hermes.exe") or self.plugin_dir.parent.parent.exists()

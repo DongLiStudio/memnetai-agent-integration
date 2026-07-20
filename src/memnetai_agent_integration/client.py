@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass
 from typing import Any, Callable
 from urllib.parse import urlencode
+from urllib.error import HTTPError
 from urllib.request import Request, urlopen
 
 
@@ -98,13 +99,32 @@ class SDKClient:
                 result = json.loads(response.read().decode("utf-8"))
                 _raise_for_response(result)
                 return result
+        except HTTPError as exc:
+            body = _http_error_json(exc)
+            if body.get("code") == "A0449":
+                return {"code": "00000", "msg": "terminal task no longer retained",
+                        "data": {"progress": 100, "terminalCode": "A0449"}}
+            raise MemNetAIError(
+                f"Unable to query memories task progress: {self._safe_error(exc)}"
+            ) from exc
         except Exception as exc:
             raise MemNetAIError(
                 f"Unable to query memories task progress: {self._safe_error(exc)}"
             ) from exc
 
     def _safe_error(self, exc: BaseException) -> str:
-        return str(exc).replace(self._api_key, "***")
+        message = str(exc).replace(self._api_key, "***")
+        if isinstance(exc, AttributeError) and "NoneType" in message and "json" in message:
+            return "API Key 无效、余额不足，或请求被服务端拒绝"
+        return message
+
+
+def _http_error_json(exc: HTTPError) -> dict[str, Any]:
+    try:
+        value = json.loads(exc.read().decode("utf-8"))
+        return value if isinstance(value, dict) else {}
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return {}
 
 
 def _raise_for_response(result: Any) -> None:

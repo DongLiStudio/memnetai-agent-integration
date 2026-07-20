@@ -10,8 +10,14 @@ specific host version.
 | WorkBuddy | `UserPromptSubmit` injects context; `Stop` identifies the session/transcript | `~/.workbuddy/settings.json` | When Stop omits the final response, the adapter reverse-scans the provided JSONL transcript |
 | Hermes | Python Plugin `pre_llm_call` returns `context`; `post_llm_call` observes the final response | `~/.hermes/plugins/memnetai-memory` | Installer enables the plugin without tool-override permission and verifies it through Hermes CLI |
 
+On Windows, Hermes uses `%LOCALAPPDATA%/hermes` unless `HERMES_HOME` explicitly overrides it.
+
 All three adapters use a five-second reply-before command deadline and keep failures non-blocking.
 Interrupted turns may omit the reply-after event, so the one-minute scheduler remains required.
+
+The production task API can remove a completed asynchronous task before the next poll and then
+return `A0449`. The integration only reconciles that explicit code as terminal for a task ID that
+was previously returned by `memories`; all other HTTP and business errors remain failures.
 
 ## Universal Agent compatibility
 

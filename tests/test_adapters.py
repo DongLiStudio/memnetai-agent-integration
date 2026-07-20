@@ -13,6 +13,17 @@ from memnetai_agent_integration.adapters.workbuddy import WorkBuddyAdapter
 
 
 class AdapterTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == "nt", "Windows Hermes home convention")
+    def test_hermes_uses_local_appdata_on_windows(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            os.environ, {"LOCALAPPDATA": directory}, clear=False
+        ):
+            with patch.dict(os.environ, {"HERMES_HOME": ""}, clear=False):
+                self.assertEqual(
+                    HermesAdapter().plugin_dir,
+                    Path(directory) / "hermes" / "plugins" / "memnetai-memory",
+                )
+
     def test_codex_hooks_merge_and_remove_without_destroying_user_hooks(self) -> None:
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {"CODEX_HOME": directory}):
             path = Path(directory) / "hooks.json"

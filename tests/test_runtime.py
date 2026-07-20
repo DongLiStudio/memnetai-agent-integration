@@ -4,7 +4,10 @@ import tempfile
 import time
 import unittest
 from contextlib import closing
+from io import BytesIO
 from pathlib import Path
+from urllib.error import HTTPError
+from unittest.mock import Mock
 
 from memnetai_agent_integration.client import MemNetAIError, SDKClient
 from memnetai_agent_integration.config import IntegrationDefaults
@@ -23,6 +26,26 @@ class FakeSDK:
 
 
 class RuntimeTests(unittest.TestCase):
+    def test_sdk_null_response_error_is_user_actionable_and_redacted(self):
+        client = SDKClient("secret-value", sdk_client=Mock())
+        message = client._safe_error(AttributeError("'NoneType' object has no attribute 'json'"))
+        self.assertIn("API Key", message)
+        self.assertNotIn("secret-value", message)
+
+    def test_completed_task_not_retained_is_reconciled(self):
+        error = HTTPError(
+            "https://api.memnetai.com/memories/task/progress", 400, "", {},
+            BytesIO(b'{"code":"A0449","msg":"task not found"}'),
+        )
+
+        def open_error(*args, **kwargs):
+            raise error
+
+        client = SDKClient("secret", sdk_client=Mock(), http_open=open_error)
+        result = client.task_progress("server-issued-task")
+        self.assertEqual(result["data"]["progress"], 100)
+        self.assertEqual(result["data"]["terminalCode"], "A0449")
+
     def test_database_context_manager_releases_windows_file_handle(self):
         with tempfile.TemporaryDirectory() as directory:
             db = Path(directory) / "state.db"

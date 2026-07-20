@@ -24,6 +24,7 @@ from .installers import (
     AtomicFileManager, InstallManifest, LinuxScheduler, MacOSLaunchdScheduler,
     WindowsTaskScheduler,
 )
+from .installers.manifest import ManifestEntry
 from .runtime import MemoryRuntime
 from .secrets import SecretError, delete_api_key, load_api_key, save_api_key, secret_path
 
@@ -52,6 +53,51 @@ def _scheduler(home: Path, manifest: InstallManifest | None = None) -> Any:
     if sys.platform == "darwin":
         return MacOSLaunchdScheduler(files, Path.home(), os.getuid())
     return LinuxScheduler(files, Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")))
+
+
+def _adapter_state_paths(adapter: Any) -> list[Path]:
+    """Files whose exact pre-install state must survive a later rollback."""
+    if isinstance(adapter, (CodexAdapter, WorkBuddyAdapter)):
+        return [adapter.config_path]
+    if isinstance(adapter, HermesAdapter):
+        home = adapter.plugin_dir.parent.parent
+        return [adapter.plugin_dir / "plugin.yaml", adapter.plugin_dir / "__init__.py",
+                home / "config.yaml"]
+    return []
+
+
+def _snapshot_paths(paths: list[Path]) -> dict[Path, bytes | None]:
+    return {path: path.read_bytes() if path.exists() else None for path in paths}
+
+
+def _restore_paths(snapshot: dict[Path, bytes | None]) -> None:
+    for path, content in snapshot.items():
+        if content is None:
+            path.unlink(missing_ok=True)
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(content)
+    parents = sorted({path.parent for path in snapshot}, key=lambda item: len(item.parts),
+                     reverse=True)
+    for parent in parents:
+        if parent.exists() and not any(parent.iterdir()):
+            parent.rmdir()
+
+
+def _capture_install_state(home: Path, manifest: InstallManifest, paths: list[Path]) -> None:
+    """Persist original host files once so repeated installs remain exactly reversible."""
+    known = {entry.path for entry in manifest.entries}
+    for path in paths:
+        if str(path) in known:
+            continue
+        created = not path.exists()
+        backup: Path | None = None
+        if not created:
+            backup = home / "backups" / f"host-{len(manifest.entries):04d}-{path.name}.bak"
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(path, backup)
+        manifest.record(ManifestEntry(str(path), created, str(backup) if backup else None))
+        known.add(str(path))
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -109,7 +155,8 @@ def _install(args: argparse.Namespace, *, repair: bool = False) -> int:
     detected = [adapter for adapter in _adapters() if adapter.detect()]
     if not detected:
         raise RuntimeError("未检测到已原生深度适配的宿主；请由安装 Skill 执行通用 Agent 能力探测")
-    manifest = InstallManifest()
+    manifest_path = home / "install-manifest.json"
+    manifest = InstallManifest.load(manifest_path) if manifest_path.exists() else InstallManifest()
     scheduler = _scheduler(home, manifest)
     if args.dry_run:
         results = [adapter.install(executable, dry_run=True) for adapter in detected]
@@ -127,12 +174,16 @@ def _install(args: argparse.Namespace, *, repair: bool = False) -> int:
     previous_config = config_path.read_bytes() if config_path.exists() else None
     database_existed = config.database_path.exists()
     installed: list[Any] = []
+    adapter_snapshot = _snapshot_paths([
+        path for adapter in detected for path in _adapter_state_paths(adapter)
+    ])
     scheduler_installed = False
     try:
         if not args.dry_run:
             save_api_key(home, key)
             save_config(config)
             initialize(config.database_path)
+            _capture_install_state(home, manifest, list(adapter_snapshot))
         results = []
         for adapter in detected:
             results.append(adapter.install(executable, dry_run=args.dry_run))
@@ -142,7 +193,7 @@ def _install(args: argparse.Namespace, *, repair: bool = False) -> int:
         if not args.dry_run:
             manifest.scheduler = plan.scheduler
             manifest.scheduler_id = plan.identifier
-            manifest.save(home / "install-manifest.json")
+            manifest.save(manifest_path)
     except BaseException:
         if not args.dry_run:
             if scheduler_installed:
@@ -150,11 +201,7 @@ def _install(args: argparse.Namespace, *, repair: bool = False) -> int:
                     scheduler.uninstall()
                 except Exception:
                     pass
-            for adapter in reversed(installed):
-                try:
-                    adapter.uninstall(executable)
-                except Exception:
-                    pass
+            _restore_paths(adapter_snapshot)
             if previous_key is None:
                 delete_api_key(home)
             else:
@@ -205,6 +252,7 @@ def _uninstall(args: argparse.Namespace) -> int:
     if manifest.scheduler:
         _scheduler(home, manifest).uninstall(dry_run=args.dry_run)
     if not args.dry_run:
+        AtomicFileManager(home / "backups", manifest).restore_all()
         delete_api_key(home)
         manifest_path.unlink(missing_ok=True)
         if args.purge_data:

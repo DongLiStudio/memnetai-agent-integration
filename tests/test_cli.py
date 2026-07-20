@@ -13,6 +13,36 @@ from memnetai_agent_integration.secrets import load_api_key, save_api_key, secre
 
 
 class CliTests(unittest.TestCase):
+    def test_restore_paths_recreates_exact_preinstall_state(self):
+        with tempfile.TemporaryDirectory() as td:
+            existing = Path(td) / "existing.json"
+            created = Path(td) / "created" / "hooks.json"
+            existing.write_bytes(b"before")
+            snapshot = cli._snapshot_paths([existing, created])
+            existing.write_bytes(b"after")
+            created.parent.mkdir()
+            created.write_bytes(b"new")
+            cli._restore_paths(snapshot)
+            self.assertEqual(existing.read_bytes(), b"before")
+            self.assertFalse(created.exists())
+            self.assertFalse(created.parent.exists())
+
+    def test_install_manifest_preserves_first_host_state_across_reinstall(self):
+        with tempfile.TemporaryDirectory() as td:
+            home = Path(td) / "data"
+            original = Path(td) / "host" / "settings.json"
+            created = Path(td) / "host" / "hooks.json"
+            original.parent.mkdir()
+            original.write_bytes(b"original")
+            manifest = cli.InstallManifest()
+            cli._capture_install_state(home, manifest, [original, created])
+            original.write_bytes(b"installed")
+            created.write_bytes(b"installed")
+            cli._capture_install_state(home, manifest, [original, created])
+            cli.AtomicFileManager(home / "backups", manifest).restore_all()
+            self.assertEqual(original.read_bytes(), b"original")
+            self.assertFalse(created.exists())
+
     def test_install_without_key_waits(self):
         with (
             tempfile.TemporaryDirectory() as td,
