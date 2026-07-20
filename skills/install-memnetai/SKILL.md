@@ -1,6 +1,6 @@
 ---
 name: install-memnetai
-description: 对话式安装、配置、修复、验证和卸载 MemNetAI Agent 长期记忆接入。用于用户给出 DongLiStudio/memnetai-agent-integration 仓库链接或安装包并要求安装，或要求接入 MemNetAI、配置 API Key、启用回复前 recall、回复后会话缓冲、满条数或静默十分钟自动记忆、排查 Hook/计划任务/余额/凭证问题时。优先使用 Hermes、Codex、WorkBuddy 原生 Hook；未知宿主先核实官方 Hook，无 Hook 时降级到全局提示词。
+description: 面向各类 AI Agent 对话式安装、配置、修复、验证和卸载 MemNetAI 长期记忆接入。用于用户给出 DongLiStudio/memnetai-agent-integration 仓库链接或安装包并要求安装，或要求接入 MemNetAI、配置 API Key、启用回复前 recall、回复后会话缓冲、满条数或静默十分钟自动记忆、排查 Hook/计划任务/余额/凭证问题时。Codex、WorkBuddy、Hermes 使用原生深度适配；其他宿主先核实官方 Hook 或插件，无可靠 Hook 时降级到全局提示词。
 ---
 
 # 安装 MemNetAI 长期记忆

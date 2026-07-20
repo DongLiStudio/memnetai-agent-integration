@@ -1,10 +1,10 @@
 # MemNetAI Agent Integration
 
-面向 Codex、WorkBuddy 和 Hermes 的本地优先 MemNetAI 长期记忆接入器。
+面向各类 AI Agent 的本地优先 MemNetAI 长期记忆接入器。Codex、WorkBuddy 和 Hermes 已提供原生深度适配；其他宿主通过能力探测接入，必要时降级为全局提示词模式。
 
 ## 一句话安装
 
-把下面这句话直接发给 Codex、WorkBuddy 或 Hermes：
+把下面这句话直接发给需要接入长期记忆的 Agent：
 
 > 请安装 MemNetAI 长期记忆系统：https://github.com/DongLiStudio/memnetai-agent-integration
 
@@ -24,13 +24,17 @@ Codex 会在首次运行新 Hook 时显示宿主自带的安全审核；这是 C
 
 ## 宿主支持
 
+本项目并不限定 Agent 品牌。安装 Skill 会先识别当前宿主并查找可验证的官方 Hook、插件或扩展机制；下表是当前已经实现并经过自动化验证的原生深度适配：
+
 | 宿主 | 回复前 | 回复后 | 安装形态 | 注意事项 |
 |---|---|---|---|---|
 | Codex | `UserPromptSubmit` | `Stop` | `~/.codex/hooks.json` | 首次需通过 Codex Hook 信任审核 |
 | WorkBuddy | `UserPromptSubmit` | `Stop` | `~/.workbuddy/settings.json` | Stop 无最终文本时从会话 JSONL 倒序读取 |
 | Hermes | `pre_llm_call` | `post_llm_call` | `~/.hermes/plugins/memnetai-memory` | 自动启用 Python Plugin；结束/重置时补交 |
 
-未知宿主会先检查官方 Hook 或插件机制。没有可靠 Hook 时，安装 Skill 只允许降级为全局提示词并标记为 best-effort，不会安装本地模型网关，也不会谎称强自动化。
+### 通用 Agent 兼容
+
+未列入上表的 Agent 仍属于项目支持范围。安装 Skill 会先检查其官方 Hook、插件、扩展机制和本机可验证配置：能够确认回复前、回复后生命周期时，按宿主能力接入；没有可靠 Hook 时，降级为全局提示词并明确标记为 `best-effort`。通用模式不会安装本地模型网关，也不会把未经验证的接入宣称为原生强自动化。
 
 详细的宿主契约和验证边界见 [`docs/compatibility.md`](docs/compatibility.md)。
 
@@ -85,7 +89,7 @@ python -m unittest discover -s tests -v
 ruff check .
 ```
 
-没有真实 API Key 时，自动化测试覆盖模拟 API、SQLite 并发与恢复、三个宿主配置、跨平台计划任务、凭证和卸载；真实 API 与宿主生命周期仍应在发布前按兼容矩阵执行端到端验收。
+没有真实 API Key 时，自动化测试覆盖模拟 API、SQLite 并发与恢复、三类原生深度适配宿主配置、通用提示词降级、跨平台计划任务、凭证和卸载；真实 API 与具体宿主生命周期仍应在发布前按兼容矩阵执行端到端验收。
 
 ## 项目结构
 
@@ -95,7 +99,7 @@ src/memnetai_agent_integration/
   installers/     跨平台文件事务和计划任务
   client.py       官方 SDK 与任务进度接口
   runtime.py      recall、缓冲、提交、轮询和重试
-  hooks.py        三宿主 Hook 输入归一化
+  hooks.py        宿主 Hook 输入归一化
   secrets.py      API Key 保护
   cli.py          安装与运行入口
 skills/install-memnetai/  Agent 一键安装协调 Skill

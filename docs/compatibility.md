@@ -13,9 +13,10 @@ specific host version.
 All three adapters use a five-second reply-before command deadline and keep failures non-blocking.
 Interrupted turns may omit the reply-after event, so the one-minute scheduler remains required.
 
-## Unsupported hosts
+## Universal Agent compatibility
 
-The installation Skill first checks the host's official extension documentation and local schema.
+Hosts not listed above are not categorically unsupported. The installation Skill first checks the
+host's official extension documentation and local schema for a verifiable lifecycle integration.
 If no verified before/after lifecycle exists, it writes or presents a marker-delimited global prompt
 only when a real global instruction file can be identified. This mode is reported as
 `automation_guaranteed=false`; it is not equivalent to native Hook support.

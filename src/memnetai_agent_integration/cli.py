@@ -108,7 +108,7 @@ def _install(args: argparse.Namespace, *, repair: bool = False) -> int:
     executable = _executable()
     detected = [adapter for adapter in _adapters() if adapter.detect()]
     if not detected:
-        raise RuntimeError("未检测到 Codex、WorkBuddy 或 Hermes；请由安装 Skill 执行通用宿主探测")
+        raise RuntimeError("未检测到已原生深度适配的宿主；请由安装 Skill 执行通用 Agent 能力探测")
     manifest = InstallManifest()
     scheduler = _scheduler(home, manifest)
     if args.dry_run:
