@@ -12,6 +12,7 @@
 before reply: append user message -> recall -> inject relevant memories
 after reply:  append assistant message -> flush immediately when count threshold is reached
 scheduled:    scan all pending sessions -> flush sessions idle for 10 minutes -> retry failures
+              -> poll submitted taskId values -> complete only at progress 100
 ```
 
 The scheduled scan is required because no host hook fires after a conversation becomes idle.
@@ -27,7 +28,10 @@ The scheduled scan is required because no host hook fires after a conversation b
 
 - SQLite uses WAL mode, foreign keys and a busy timeout.
 - Messages are sealed into an idempotent batch before submission.
-- Asynchronous acceptance does not delete source messages; completion must be confirmed first.
+- Asynchronous acceptance stores the returned `taskId`; source messages remain local and the
+  batch becomes complete only when the documented progress endpoint reaches 100.
+- The remote memories API does not guarantee idempotency. A progress-query failure never causes
+  an already-submitted batch to be sent again.
 - API failures never block the host Agent's ordinary response.
 
 ## User-visible failures
@@ -35,4 +39,3 @@ The scheduled scan is required because no host hook fires after a conversation b
 Authentication, balance, quota and rate-limit failures should be visible without repeated alert spam. User-actionable notices link directly to:
 
 <https://dashboard.memnetai.com>
-

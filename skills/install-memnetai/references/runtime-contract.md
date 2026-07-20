@@ -20,7 +20,7 @@ namespace: default
 - 宿主明确结束会话或用户明确要求记住：立即封存。
 - 计划任务扫描所有 `pending_count > 0` 且已到 `next_flush_at` 的会话，并重试失败批次。
 
-提交采用 `pending -> sealed -> submitting -> accepted -> processing -> completed` 状态。异步请求被接受后不得立即删除本地消息；只有确认完成后才清理或归档。
+提交采用 `pending -> sealed -> submitting -> submitted -> complete` 状态，失败进入 `retry` 或 `failed`。异步请求被接受后不得立即删除本地消息；只有任务进度达到 100 后才标记完成。
 
 ## 并发与恢复
 
@@ -42,4 +42,3 @@ namespace: default
 ## API Key
 
 用户允许在聊天正文提供 API Key，但集成程序必须：不复述、不写日志、不写 SQLite 消息、不提交长期记忆、不进入 Git或错误报告。宿主自身可能保留聊天记录，安装结果应说明这一客观边界。
-

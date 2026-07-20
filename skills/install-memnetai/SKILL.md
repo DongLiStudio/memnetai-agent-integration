@@ -14,6 +14,7 @@ description: 对话式安装、配置、修复、验证和卸载 MemNetAI Agent 
 - `references/installation-workflow.md`：两阶段安装、状态机和验收条件。
 - `references/host-integration.md`：宿主识别、原生 Hook 映射和提示词降级规则。
 - `references/runtime-contract.md`：会话缓冲、定时提交、错误提示和数据安全约束。
+- `references/api-contract.md`：MemNetAI 官方 SDK、recall、memories 和异步任务契约。
 
 ## 核心规则
 
@@ -21,19 +22,19 @@ description: 对话式安装、配置、修复、验证和卸载 MemNetAI Agent 
 - 默认使用 `memory_agent_name=personal-agent`、`namespace=default`、静默 10 分钟、最多 32 条触发。
 - API Key 可以由用户在当前对话中提供；收到后不得复述、写日志、进入会话缓冲或长期记忆。
 - 优先安装当前宿主经过验证的原生生命周期 Hook。未知宿主只采用官方文档或本机可验证配置；没有 Hook 时直接降级为全局提示词，不使用本地模型网关。
-- 安装前展示将修改的宿主配置和系统计划任务；备份配置并获得确认后再写入。
+- 安装器自行规划、写入并回读宿主配置和系统计划任务；仅宿主强制的安全信任界面需要用户确认。
 - 任何 API、Hook、计划任务或健康检查结果都要独立回读；命令退出码不等于安装成功。
 - recall 或 memories 失败不能阻塞普通回答。余额、额度、凭证和限流问题显性提示用户前往 <https://dashboard.memnetai.com>。
-- 当前产品尚处于预发布阶段时，只允许开发验证，不得把脚手架状态描述为可生产安装。
+- Codex 首次运行非托管 Hook 会要求用户审核信任；不得使用危险绕过参数，也不得把该宿主确认误称为 MemNetAI 配置项。
 
 ## 安装流程
 
 1. 定位当前完整仓库；若只有仓库链接，在新的系统临时目录获取官方仓库并记录 URL、ref 和 commit。
 2. 检查 Python 3.11+、项目 CLI、平台、当前宿主及目标配置文件，不自动安装未知来源依赖。
-3. 运行安装计划或 dry-run，展示将创建的本地目录、SQLite、宿主 Hook、计划任务和全局提示词变化。
-4. 用户确认后执行不依赖 API Key 的准备阶段；完成后回读文件、数据库、Hook 注册和计划任务状态。
-5. 请求用户提供 API Key，立即写入受保护配置，不在后续输出中复述。
-6. 使用默认 `personal-agent/default` 完成 memories 与 recall 健康检查。
+3. 在仓库根运行 `python scripts/bootstrap.py`；启动器创建/更新隔离 venv，并返回 `waiting_for_api_key`。
+4. 请求用户提供 API Key。把 Key 通过标准输入交给 `python scripts/bootstrap.py --api-key-stdin`，不得放进命令参数或复述。
+5. 安装器自动验证 Key、初始化 SQLite、安装宿主 Hook/Plugin、注册计划任务并回读。
+6. 使用默认 `personal-agent/default` 完成 recall 健康检查；记忆提交和异步进度使用隔离测试会话验证。
 7. 触发真实宿主测试，确认回复前 Hook 能注入 recall，回复后 Hook 能记录当前会话。
 8. 验证 `flush-due` 能扫描所有未沉淀会话，并能处理满 32 条、静默 10 分钟及失败重试。
 9. 输出已完成证据、降级能力、未验证项、控制台链接和卸载/修复入口。
@@ -45,4 +46,3 @@ description: 对话式安装、配置、修复、验证和卸载 MemNetAI Agent 
 - memories、recall、回复前、回复后和计划任务分别有验证结果。
 - 凭证未出现在日志、数据库缓冲、Git diff 或最终输出中。
 - 失败和降级项保持显性，不把准备完成等同于安装完成。
-

@@ -3,8 +3,8 @@
 ## 状态机
 
 ```text
-locate-source -> runtime-preflight -> detect-host -> plan -> confirm
-  -> prepare -> waiting-for-api-key -> configure -> api-health-check
+locate-source -> runtime-preflight -> install-package -> waiting-for-api-key
+  -> configure -> detect-host -> install-hooks -> api-health-check
   -> hook-smoke-test -> scheduler-smoke-test -> complete
 ```
 
@@ -18,32 +18,27 @@ locate-source -> runtime-preflight -> detect-host -> plan -> confirm
 
 ## 阶段一：准备
 
-在用户确认影响范围后：
-
 1. 找到或准备 Python 3.11+ 独立环境。
 2. 安装锁定版本的项目包和 MemNetAI SDK。
-3. 初始化本地配置目录与 SQLite。
-4. 检测宿主并安装原生 Hook；没有 Hook 时生成待用户保存的全局提示词。
-5. 注册当前操作系统的 `flush-due` 计划任务。
-6. 备份并回读修改过的宿主配置。
+3. 在仓库根运行 `python scripts/bootstrap.py`；由启动器创建/更新隔离 venv、安装本项目和官方 SDK，并读取结构化状态。
 
-API Key 尚未提供时，Hook 和计划任务可以安装，但不得向 MemNetAI 发送请求。阶段一状态必须是 `waiting-for-api-key`，不能称为安装完成。
+API Key 尚未提供时不写宿主配置、不注册任务，也不向 MemNetAI 发送请求。阶段一状态必须是 `waiting_for_api_key`，不能称为安装完成。
 
 ## 阶段二：配置和验证
 
 用户在对话中提供 API Key 后：
 
-1. 不复述 Key；通过标准输入或临时进程环境写入凭证文件，避免出现在进程参数和日志中。
+1. 不复述 Key；通过标准输入交给 `python scripts/bootstrap.py --api-key-stdin`，避免出现在进程参数和日志中。
 2. 使用 `personal-agent/default`，不询问记忆体名称。
-3. 验证 API Key、memories 和 recall；测试消息使用可识别的健康检查内容，并避免污染正式记忆或在验证后清理测试数据。
+3. 验证 API Key 和 recall；memories 使用隔离测试会话，并轮询 taskId 到完成，避免把提交接受误称为完成。
 4. 触发一次真实回复前/回复后流程。
 5. 创建隔离测试会话，验证到期扫描与失败重试，不等待真实十分钟。
 
 ## 修复和卸载
 
 - `doctor`：只读检查版本、配置、数据库、Hook、计划任务、待处理会话和最近错误。
-- `repair`：先展示差异，备份后只修复缺失或失效部分。
-- `uninstall`：移除 Hook、计划任务和程序文件；凭证、SQLite和未沉淀消息是否保留由用户明确选择。
+- `repair`：复用已保存 Key，只修复缺失或失效部分。
+- `uninstall`：移除 Hook、计划任务和凭证，默认保留 SQLite；只有用户明确要求才 `--purge-data`。
 
 ## 安装验收
 
@@ -52,4 +47,3 @@ API Key 尚未提供时，Hook 和计划任务可以安装，但不得向 MemNet
 - 数量阈值和静默到期扫描分别通过测试。
 - API错误会显性通知但不阻塞普通回答。
 - 重复安装不产生重复 Hook、重复计划任务或重复数据库结构。
-
