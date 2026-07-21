@@ -39,7 +39,20 @@ def _home() -> Path:
 
 def _executable() -> Path:
     override = os.environ.get("MEMNETAI_INTEGRATION_EXECUTABLE")
-    return Path(override or shutil.which("memnetai-integration") or sys.argv[0]).resolve()
+    candidates = [
+        override,
+        shutil.which("memnetai-integration"),
+        str(Path(sys.executable).parent /
+            ("memnetai-integration.exe" if sys.platform == "win32" else "memnetai-integration")),
+    ]
+    argument_zero = sys.argv[0] if sys.argv and sys.argv[0] not in {"-c", "-m", ""} else None
+    candidates.append(argument_zero)
+    for candidate in candidates:
+        if candidate and Path(candidate).expanduser().is_file():
+            return Path(candidate).expanduser().resolve()
+    raise RuntimeError(
+        "找不到 memnetai-integration 可执行文件；拒绝把 python -c/-m 等启动参数写入 Hook"
+    )
 
 
 def _adapters() -> list[Any]:

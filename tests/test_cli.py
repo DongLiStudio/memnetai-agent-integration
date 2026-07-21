@@ -13,6 +13,17 @@ from memnetai_agent_integration.secrets import load_api_key, save_api_key, secre
 
 
 class CliTests(unittest.TestCase):
+    def test_executable_never_accepts_python_dash_c_as_hook_command(self):
+        with (
+            tempfile.TemporaryDirectory() as td,
+            patch.dict(os.environ, {"MEMNETAI_INTEGRATION_EXECUTABLE": ""}, clear=False),
+            patch.object(cli.shutil, "which", return_value=None),
+            patch.object(cli.sys, "argv", ["-c"]),
+            patch.object(cli.sys, "executable", str(Path(td) / "python.exe")),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "拒绝"):
+                cli._executable()
+
     def test_restore_paths_recreates_exact_preinstall_state(self):
         with tempfile.TemporaryDirectory() as td:
             existing = Path(td) / "existing.json"
