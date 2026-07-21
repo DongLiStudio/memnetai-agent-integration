@@ -6,7 +6,9 @@
 
 把下面这句话直接发给需要接入长期记忆的 Agent：
 
-> 请安装 MemNetAI 长期记忆系统：https://github.com/DongLiStudio/memnetai-agent-integration
+```text
+请安装 MemNetAI 长期记忆系统：https://github.com/DongLiStudio/memnetai-agent-integration
+```
 
 Agent 会读取仓库中的 `skills/install-memnetai/SKILL.md`，自动准备 Python 环境、安装程序、识别当前宿主、写入 Hook、注册计划任务并逐项回读。用户只需在 Agent 询问时提供一次 MemNetAI API Key。
 
