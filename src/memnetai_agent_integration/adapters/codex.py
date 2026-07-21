@@ -28,6 +28,7 @@ class CodexAdapter:
         config = read_json_object(self.config_path)
         changed = merge_hook(config, "UserPromptSubmit", hook_command(executable, "before"))
         changed |= merge_hook(config, "Stop", hook_command(executable, "after"))
+        changed |= merge_hook(config, "SessionStart", hook_command(executable, "session-start"))
         if changed and not dry_run:
             write_json_atomic(self.config_path, config)
         return AdapterResult(self.name, self.detect(), not dry_run, not dry_run, "native-hooks",
@@ -36,7 +37,8 @@ class CodexAdapter:
     def verify(self, executable: Path) -> AdapterResult:
         try:
             text = self.config_path.read_text(encoding="utf-8-sig")
-            ok = "memnetai-integration" in text and "UserPromptSubmit" in text and "Stop" in text
+            ok = all(value in text for value in
+                     ("memnetai-integration", "SessionStart", "UserPromptSubmit", "Stop"))
         except OSError:
             ok = False
         return AdapterResult(self.name, self.detect(), ok, ok, "native-hooks",

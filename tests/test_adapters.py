@@ -45,6 +45,39 @@ class AdapterTests(unittest.TestCase):
             adapter.install(Path("memnetai-integration"))
             self.assertEqual(Path(directory) / "settings.json", adapter.config_path)
             self.assertTrue(adapter.verify(Path("memnetai-integration")).verified)
+            data = json.loads(adapter.config_path.read_text(encoding="utf-8"))
+            self.assertNotIn("hooks", data)
+            self.assertIn("UserPromptSubmit", data)
+            self.assertIn("Stop", data)
+            self.assertIn("SessionStart", data)
+
+    def test_workbuddy_removes_empty_legacy_wrapper(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            os.environ, {"WORKBUDDY_HOME": directory}
+        ):
+            path = Path(directory) / "settings.json"
+            path.write_text(json.dumps({"hooks": {"UserPromptSubmit": [], "Stop": []}}),
+                            encoding="utf-8")
+            WorkBuddyAdapter().install(Path("memnetai-integration"))
+            self.assertNotIn("hooks", json.loads(path.read_text(encoding="utf-8")))
+
+    def test_workbuddy_migrates_old_nested_shape_without_removing_user_hook(self) -> None:
+        with tempfile.TemporaryDirectory() as directory, patch.dict(
+            os.environ, {"WORKBUDDY_HOME": directory}
+        ):
+            path = Path(directory) / "settings.json"
+            path.write_text(json.dumps({
+                "hooks": {"Stop": [{"hooks": [
+                    {"type": "command", "command": "memnetai-integration hook-after"},
+                    {"type": "command", "command": "user-command"},
+                ]}]},
+                "theme": "dark",
+            }), encoding="utf-8")
+            WorkBuddyAdapter().install(Path("memnetai-integration"))
+            data = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(data["theme"], "dark")
+            self.assertEqual(data["hooks"]["Stop"][0]["hooks"][0]["command"], "user-command")
+            self.assertIn("Stop", data)
 
     def test_hermes_plugin_is_idempotent_and_reversible(self) -> None:
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {"HERMES_HOME": directory}):

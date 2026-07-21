@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "memnetai-agent-integration"
-version = "0.1.1"
+version = "0.2.0"
 description = "Local-first MemNetAI integration for AI agent hosts"
 readme = "README.md"
 requires-python = ">=3.11"

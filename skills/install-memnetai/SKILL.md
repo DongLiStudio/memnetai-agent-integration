@@ -26,6 +26,7 @@ description: 面向各类 AI Agent 对话式安装、配置、修复、验证和
 - 任何 API、Hook、计划任务或健康检查结果都要独立回读；命令退出码不等于安装成功。
 - recall 或 memories 失败不能阻塞普通回答。余额、额度、凭证和限流问题显性提示用户前往 <https://dashboard.memnetai.com>。
 - Codex 首次运行非托管 Hook 会要求用户审核信任；不得使用危险绕过参数，也不得把该宿主确认误称为 MemNetAI 配置项。
+- “宿主配置已写入”只代表 `configured`。必须取得当前宿主 `SessionStart`、回复前和回复后运行时回执，才可称为 `active` 或安装完成。
 
 ## 安装流程
 
@@ -35,14 +36,16 @@ description: 面向各类 AI Agent 对话式安装、配置、修复、验证和
 4. 请求用户提供 API Key。把 Key 通过标准输入交给 `python scripts/bootstrap.py --api-key-stdin`，不得放进命令参数或复述。
 5. 安装器自动验证 Key、初始化 SQLite、安装宿主 Hook/Plugin、注册计划任务并回读。
 6. 使用默认 `personal-agent/default` 完成 recall 健康检查；记忆提交和异步进度使用隔离测试会话验证。
-7. 触发真实宿主测试，确认回复前 Hook 能注入 recall，回复后 Hook 能记录当前会话。
-8. 验证 `flush-due` 能扫描所有未沉淀会话，并能处理满 32 条、静默 10 分钟及失败重试。
-9. 输出已完成证据、降级能力、未验证项、控制台链接和卸载/修复入口。
+7. 按安装器返回的 `activation_required` 操作：Codex 在 `/hooks` 信任后新开任务；WorkBuddy 重启后新开任务。
+8. 在新任务完成一轮问答，运行 `doctor --json`，确认 `SessionStart`、`before`、`after` 三类回执齐全。
+9. 验证 `flush-due` 能扫描所有未沉淀会话，并能处理满 32 条、静默 10 分钟及失败重试。
+10. 输出已完成证据、降级能力、未验证项、控制台链接和卸载/修复入口。
 
 ## 完成条件
 
 - 当前宿主模式明确标为原生 Hook 或全局提示词降级。
 - SQLite、默认记忆体、namespace、静默时间和数量阈值均已回读。
 - memories、recall、回复前、回复后和计划任务分别有验证结果。
+- Codex/WorkBuddy 的 `doctor` 已观察到新会话启动及同一宿主的回复前、回复后回执；否则状态必须保持 `activation_required`。
 - 凭证未出现在日志、数据库缓冲、Git diff 或最终输出中。
 - 失败和降级项保持显性，不把准备完成等同于安装完成。

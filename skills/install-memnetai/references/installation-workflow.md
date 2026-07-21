@@ -5,7 +5,8 @@
 ```text
 locate-source -> runtime-preflight -> install-package -> waiting-for-api-key
   -> configure -> detect-host -> install-hooks -> api-health-check
-  -> hook-smoke-test -> scheduler-smoke-test -> complete
+  -> activation-required -> new-session -> hook-runtime-proof
+  -> scheduler-smoke-test -> complete
 ```
 
 每次等待用户输入时，明确当前阶段、已经验证的结果和下一步。安装中断后从最近验证阶段继续，不重复执行已经成功的外部写入。
@@ -33,6 +34,10 @@ API Key 尚未提供时不写宿主配置、不注册任务，也不向 MemNetAI
 3. 验证 API Key 和 recall；memories 使用隔离测试会话，并轮询 taskId 到完成，避免把提交接受误称为完成。
 4. 触发一次真实回复前/回复后流程。
 5. 创建隔离测试会话，验证到期扫描与失败重试，不等待真实十分钟。
+
+Codex/WorkBuddy 写入配置后必须先返回 `activation_required`。Codex 需要用户在 `/hooks`
+信任，WorkBuddy 需要重启；两者均需新开任务。`doctor` 观察到 `SessionStart`、`before`、
+`after` 回执前，不得进入 `complete`。
 
 ## 修复和卸载
 

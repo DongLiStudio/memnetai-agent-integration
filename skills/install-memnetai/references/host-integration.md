@@ -5,8 +5,8 @@
 | 宿主 | 回复前事件 | 回复后事件 | 说明 |
 |---|---|---|---|
 | Hermes | `pre_llm_call` | `post_llm_call` | 同时利用会话生命周期事件做关闭时提交 |
-| Codex | `UserPromptSubmit` | `Stop` | 必须按实际版本和运行界面做真实触发测试 |
-| WorkBuddy | `UserPromptSubmit` | `Stop` | Stop 缺少最终回复字段时，从 `transcript_path` JSONL 倒序提取 |
+| Codex | `SessionStart` / `UserPromptSubmit` | `Stop` | `~/.codex/hooks.json` 使用 `hooks` 包装；在 `/hooks` 信任后新开任务 |
+| WorkBuddy | `SessionStart` / `UserPromptSubmit` | `Stop` | `~/.workbuddy/settings.json` 的事件必须位于根节点，不使用 `hooks` 包装；修改后重启 |
 
 回复前事件执行：记录用户消息、调用 recall、注入有限的相关长期记忆。回复后事件执行：记录最终助手回复、检查当前会话未沉淀数量、满 32 条时立即封存提交。
 
@@ -36,4 +36,5 @@
 - 相同命令幂等去重；路径变化时移除或迁移旧 Hook，避免重复执行。
 - Hook脚本以普通用户权限运行，首次信任或授权由宿主和用户确认。
 - Codex 的非托管 Hook 首次必须由用户在宿主界面审核；禁止使用危险跳过信任参数。
+- WorkBuddy 的用户设置格式与插件 `hooks/hooks.json` 不同：前者是顶层事件，后者才使用 `hooks` 包装。不得混用。
 - Hermes 使用 Python Plugin，并通过 `hermes plugins enable --no-allow-tool-override` 自动启用，不申请覆盖内置工具。

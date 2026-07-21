@@ -56,14 +56,57 @@ def write_json_atomic(path: Path, value: dict[str, Any]) -> None:
     os.replace(temporary, path)
 
 
-def hook_command(executable: Path, event: str) -> dict[str, Any]:
+def hook_command(executable: Path, event: str, host: str | None = None) -> dict[str, Any]:
+    host_arg = f" --host {host}" if host else ""
     return {
         "type": "command",
-        "command": f'"{executable}" hook-{event}',
-        "commandWindows": f'"{executable}" hook-{event}',
+        "command": f'"{executable}" hook-{event}{host_arg}',
+        "commandWindows": f'"{executable}" hook-{event}{host_arg}',
         "timeout": 5 if event == "before" else 15,
         "statusMessage": "MemNetAI recall" if event == "before" else "MemNetAI capture",
     }
+
+
+def merge_direct_hook(config: dict[str, Any], event: str, command: dict[str, Any]) -> bool:
+    """Merge a user-settings hook (events live at the JSON root)."""
+    groups = config.setdefault(event, [])
+    if not isinstance(groups, list):
+        raise ValueError(f"{event} must be an array")
+    for group in groups:
+        if not isinstance(group, dict):
+            continue
+        for item in group.get("hooks", []):
+            if isinstance(item, dict) and MARKER in str(item.get("command", "")):
+                if item != command:
+                    item.clear()
+                    item.update(command)
+                    return True
+                return False
+    groups.append({"matcher": "*", "hooks": [command]})
+    return True
+
+
+def remove_direct_managed_hooks(config: dict[str, Any]) -> bool:
+    changed = False
+    for event in ("SessionStart", "UserPromptSubmit", "Stop"):
+        groups = config.get(event)
+        if not isinstance(groups, list):
+            continue
+        kept = []
+        for group in groups:
+            if not isinstance(group, dict) or not isinstance(group.get("hooks"), list):
+                kept.append(group)
+                continue
+            filtered = [item for item in group["hooks"] if not (
+                isinstance(item, dict) and MARKER in str(item.get("command", ""))
+            )]
+            changed |= len(filtered) != len(group["hooks"])
+            if filtered:
+                updated = dict(group)
+                updated["hooks"] = filtered
+                kept.append(updated)
+        config[event] = kept
+    return changed
 
 
 def merge_hook(config: dict[str, Any], event: str, command: dict[str, Any]) -> bool:

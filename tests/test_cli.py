@@ -103,6 +103,21 @@ class CliTests(unittest.TestCase):
             self.assertEqual(result["hookSpecificOutput"]["additionalContext"], "memory")
             self.assertNotIn("api", out.getvalue().lower())
 
+    def test_workbuddy_user_prompt_field_and_runtime_heartbeat(self):
+        runtime = Mock()
+        runtime.before_reply.return_value = Mock(ok=True, payload=Mock(memories=()), user_notice=None)
+        payload = json.dumps({"session_id": "s", "user_prompt": "hello"})
+        with (
+            tempfile.TemporaryDirectory() as td,
+            patch.dict(os.environ, {"MEMNETAI_INTEGRATION_HOME": td}),
+            patch.object(cli, "_runtime", return_value=runtime),
+            patch("sys.stdin", io.StringIO(payload)),
+            patch("sys.stdout", new_callable=io.StringIO),
+        ):
+            self.assertEqual(cli.main(["hook-before", "--host", "workbuddy"]), 0)
+            runtime.before_reply.assert_called_once()
+            self.assertTrue((Path(td) / "hook-health" / "workbuddy-before.json").exists())
+
     def test_api_key_message_is_never_buffered(self):
         runtime = Mock()
         payload = json.dumps({"session_id": "s", "turn_id": "t", "prompt": "secret-key"})

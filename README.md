@@ -28,8 +28,8 @@ Codex 会在首次运行新 Hook 时显示宿主自带的安全审核；这是 C
 
 | 宿主 | 回复前 | 回复后 | 安装形态 | 注意事项 |
 |---|---|---|---|---|
-| Codex | `UserPromptSubmit` | `Stop` | `~/.codex/hooks.json` | 首次需通过 Codex Hook 信任审核 |
-| WorkBuddy | `UserPromptSubmit` | `Stop` | `~/.workbuddy/settings.json` | Stop 无最终文本时从会话 JSONL 倒序读取 |
+| Codex | `SessionStart` / `UserPromptSubmit` | `Stop` | `~/.codex/hooks.json` | 在 `/hooks` 信任 Hook 后新开任务 |
+| WorkBuddy | `SessionStart` / `UserPromptSubmit` | `Stop` | `~/.workbuddy/settings.json` 顶层事件 | 安装后必须重启并新开任务；Stop 从会话 JSONL 读取最终文本 |
 | Hermes | `pre_llm_call` | `post_llm_call` | `~/.hermes/plugins/memnetai-memory` | 自动启用 Python Plugin；结束/重置时补交 |
 
 ### 通用 Agent 兼容
@@ -79,6 +79,12 @@ memnetai-integration flush-due
 memnetai-integration uninstall
 ```
 
+安装器写完配置后返回 `activation_required`，不会把“配置文件存在”当成“Hook 已运行”。
+Codex 完成 `/hooks` 信任、WorkBuddy 完成重启后，需要各自新开一个任务并完成一轮问答；
+随后 `doctor` 只有同时观察到回复前 `before` 和回复后 `after` 的真实运行回执，才返回
+`ok`。每次新会话的 `SessionStart` 还会明确告知 Agent：MemNetAI 已加载，无需依靠提示词手动
+调用 recall。
+
 ## 开发验证
 
 要求 Python 3.11+，运行时依赖官方 `memnetai-python-sdk>=1.0.2,<2`。
@@ -89,7 +95,7 @@ python -m unittest discover -s tests -v
 ruff check .
 ```
 
-没有真实 API Key 时，自动化测试覆盖模拟 API、SQLite 并发与恢复、三类原生深度适配宿主配置、通用提示词降级、跨平台计划任务、凭证和卸载；真实 API 与具体宿主生命周期仍应在发布前按兼容矩阵执行端到端验收。
+没有真实 API Key 时，自动化测试覆盖模拟 API、SQLite 并发与恢复、三类原生深度适配宿主配置、通用提示词降级、跨平台计划任务、凭证和卸载；真实 API 与具体宿主生命周期仍应在发布前按兼容矩阵执行端到端验收。配置结构测试不等于宿主已加载，运行时结果以 `doctor` 的 Hook 回执为准。
 
 0.1.1 已使用真实 MemNetAI API 完成安装、记忆提交、异步进度、跨会话回忆、数量阈值、静默到期、重复安装和无残留卸载闭环；测试记忆体为默认 `personal-agent/default`。具体宿主版本升级后仍需按兼容矩阵复验其生命周期事件。
 

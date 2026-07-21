@@ -6,11 +6,14 @@ specific host version.
 
 | Host | Contract | Local configuration | Verification boundary |
 |---|---|---|---|
-| Codex | `UserPromptSubmit` injects `additionalContext`; `Stop` provides `last_assistant_message` | `~/.codex/hooks.json` | Codex requires first-use review/trust for non-managed command hooks |
-| WorkBuddy | `UserPromptSubmit` injects context; `Stop` identifies the session/transcript | `~/.workbuddy/settings.json` | When Stop omits the final response, the adapter reverse-scans the provided JSONL transcript |
+| Codex | `SessionStart`; `UserPromptSubmit` injects context; `Stop` captures the response | `~/.codex/hooks.json` with `hooks` wrapper | Trust through `/hooks`, open a new task, then require runtime receipts |
+| WorkBuddy | `SessionStart`; `UserPromptSubmit` uses `user_prompt`; `Stop` identifies the transcript | top-level events in `~/.workbuddy/settings.json` | Restart, open a new task, and reverse-scan JSONL when Stop omits the response |
 | Hermes | Python Plugin `pre_llm_call` returns `context`; `post_llm_call` observes the final response | `~/.hermes/plugins/memnetai-memory` | Installer enables the plugin without tool-override permission and verifies it through Hermes CLI |
 
 On Windows, Hermes uses `%LOCALAPPDATA%/hermes` unless `HERMES_HOME` explicitly overrides it.
+
+Configuration presence is not runtime activation. `doctor` reports healthy only after observing
+`SessionStart`, reply-before, and reply-after receipts for a configured host.
 
 All three adapters use a five-second reply-before command deadline and keep failures non-blocking.
 Interrupted turns may omit the reply-after event, so the one-minute scheduler remains required.

@@ -20,6 +20,7 @@ from .config import (
 )
 from .database import due_sessions, initialize, retryable_batches, submitted_batches
 from .hooks import normalize, read_payload
+from .health import read_host, record
 from .installers import (
     AtomicFileManager, InstallManifest, LinuxScheduler, MacOSLaunchdScheduler,
     WindowsTaskScheduler,
@@ -115,8 +116,9 @@ def _parser() -> argparse.ArgumentParser:
     uninstall = sub.add_parser("uninstall")
     uninstall.add_argument("--purge-data", action="store_true")
     uninstall.add_argument("--dry-run", action="store_true")
-    sub.add_parser("hook-before")
-    sub.add_parser("hook-after")
+    for command in ("hook-before", "hook-after", "hook-session-start"):
+        hook = sub.add_parser(command)
+        hook.add_argument("--host", choices=("codex", "workbuddy", "hermes"))
     sub.add_parser("flush-due")
     flush = sub.add_parser("flush-session")
     flush.add_argument("--session-id")
@@ -215,8 +217,16 @@ def _install(args: argparse.Namespace, *, repair: bool = False) -> int:
                 Path(str(config.database_path) + "-wal").unlink(missing_ok=True)
                 Path(str(config.database_path) + "-shm").unlink(missing_ok=True)
         raise
-    _emit({"status": "repaired" if repair else "installed", "hosts": results,
-           "scheduler": plan.scheduler, "dry_run": args.dry_run})
+    activation = []
+    for result in results:
+        host = result.host if hasattr(result, "host") else result.get("host")
+        if host == "codex":
+            activation.append({"host": "codex", "action": "在 Codex /hooks 中信任 MemNetAI Hook，然后新开任务"})
+        elif host == "workbuddy":
+            activation.append({"host": "workbuddy", "action": "重启 WorkBuddy/CodeBuddy 并新开任务"})
+    _emit({"status": "activation_required" if activation else ("repaired" if repair else "installed"),
+           "hosts": results, "scheduler": plan.scheduler, "activation": activation,
+           "dry_run": args.dry_run})
     return 0
 
 
@@ -227,13 +237,19 @@ def _doctor(as_json: bool) -> int:
     manifest_path = home / "install-manifest.json"
     manifest = InstallManifest.load(manifest_path) if manifest_path.exists() else InstallManifest()
     scheduler_ok = _scheduler(home, manifest).verify() if manifest.scheduler else False
-    healthy = secret_path(home).exists() and scheduler_ok and any(r.verified for r in results)
+    host_health = {item.host: read_host(home, item.host) for item in results if item.installed}
+    active_hosts = [host for host, events in host_health.items()
+                    if all(events[event] is not None
+                           for event in ("session-start", "before", "after"))]
+    healthy = secret_path(home).exists() and scheduler_ok and bool(active_hosts)
     result = {
         "status": "ok" if healthy else "needs_repair",
         "version": __version__,
         "api_key_configured": secret_path(home).exists(),
         "scheduler": scheduler_ok,
         "hosts": results,
+        "hook_runtime": host_health,
+        "active_hosts": active_hosts,
         "config": public_config(load_config()),
     }
     if as_json:
@@ -265,9 +281,21 @@ def _uninstall(args: argparse.Namespace) -> int:
     return 0
 
 
-def _hook(event: str) -> int:
+def _hook(event: str, forced_host: str | None = None) -> int:
     try:
-        message = normalize(read_payload(sys.stdin), event=event)
+        payload = read_payload(sys.stdin)
+        if forced_host:
+            payload["host"] = forced_host
+        message = normalize(payload, event=event)
+        try:
+            record(_home(), message.host, event, message.session_id)
+        except OSError:
+            # Telemetry must never disable recall/capture itself.
+            pass
+        if event == "session-start":
+            _emit({"continue": True, "suppressOutput": True,
+                   "systemMessage": "MemNetAI 长期记忆 Hook 已加载；每轮回复前自动回忆、回复后自动记录。可运行 memnetai-integration doctor --json 查看触发状态。"})
+            return 0
         runtime = _runtime()
         if event == "before":
             if not message.prompt:
@@ -354,8 +382,8 @@ def main(argv: list[str] | None = None) -> int:
             return _install(args, repair=True)
         if args.command == "uninstall":
             return _uninstall(args)
-        if args.command in {"hook-before", "hook-after"}:
-            return _hook(args.command.removeprefix("hook-"))
+        if args.command in {"hook-before", "hook-after", "hook-session-start"}:
+            return _hook(args.command.removeprefix("hook-"), args.host)
         if args.command == "flush-due":
             return _flush()
         if args.command == "flush-session":
